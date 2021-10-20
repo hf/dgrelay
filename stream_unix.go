@@ -40,11 +40,14 @@ func (fd *StreamFD) Read(queue *Queue) (int, error) {
 
 			switch err {
 			case unix.EINTR:
-				shouldRun = true
+				fallthrough
 
 			case nil:
-				buf.WOff = 0 // ready for writing
-				shouldRun = read < 3
+				shouldRun = read < 3 || read < (2+buf.Readsize())
+
+				if !shouldRun {
+					buf.WOff = 0 // ready for writing
+				}
 
 			default:
 				return i, err

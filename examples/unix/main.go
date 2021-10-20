@@ -46,7 +46,7 @@ func main() {
 	sfd := fds[0]
 
 	go func() {
-		dgrelay.Forward(context.Background(), afd, bfd)
+		dgrelay.Forward(context.Background(), afd, bfd, 8, 2048)
 	}()
 
 	go func() {
