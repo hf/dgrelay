@@ -27,7 +27,7 @@ func (fd *StreamFD) Read(queue *Queue) (int, error) {
 			n := 0
 			var err error
 
-			if read < 2 {
+			if read < 3 {
 				n, err = unix.Read(fd.FD, buf.Data[read:2+fd.MinData])
 			} else {
 				n, err = unix.Read(fd.FD, buf.Data[read:2+buf.Readsize()])
