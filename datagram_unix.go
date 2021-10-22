@@ -22,23 +22,19 @@ func (fd *DatagramFD) Read(queue *Queue) (int, error) {
 			panic("roffset not 0")
 		}
 
-		shouldRun := true
+	read: // goto label
+		n, err := unix.Read(fd.FD, buf.Data[2:])
+		switch err {
+		case unix.EINTR:
+			goto read
 
-		for shouldRun {
-			n, err := unix.Read(fd.FD, buf.Data[2:])
-			switch err {
-			case unix.EINTR:
-				shouldRun = true
+		case nil:
+			buf.Writesize(n)
 
-			case nil:
-				buf.Writesize(n)
+			buf.WOff = 0 // ready for writing
 
-				buf.WOff = 0 // ready for writing
-				shouldRun = false
-
-			default:
-				return i, err
-			}
+		default:
+			return i, err
 		}
 	}
 
@@ -55,24 +51,21 @@ func (fd *DatagramFD) Write(queue *Queue) (int, error) {
 			panic("woffset not 0")
 		}
 
-		shouldRun := true
-		for shouldRun {
-			n, err := unix.Write(fd.FD, buf.Data[2:2+buf.Readsize()])
-			switch err {
-			case unix.EINTR:
-				shouldRun = true
+	write: // goto label
+		n, err := unix.Write(fd.FD, buf.Data[2:2+buf.Readsize()])
+		switch err {
+		case unix.EINTR:
+			goto write
 
-			case nil:
-				if n != buf.Readsize() {
-					panic("written bytes != buffer bytes")
-				}
-
-				buf.ROff = 0 // ready for reading
-				shouldRun = false
-
-			default:
-				return i, err
+		case nil:
+			if n != buf.Readsize() {
+				panic("written bytes != buffer bytes")
 			}
+
+			buf.ROff = 0 // ready for reading
+
+		default:
+			return i, err
 		}
 	}
 

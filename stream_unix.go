@@ -19,39 +19,36 @@ func (fd *StreamFD) Read(queue *Queue) (int, error) {
 	for i := 0; i < qsize; i += 1 {
 		buf := queue.Peek(i)
 
-		read := buf.ROff
+		roff := buf.ROff
 
-		shouldRun := true
+	read: // goto label
+		n := 0
+		var err error
 
-		for shouldRun {
-			n := 0
-			var err error
+		if roff < 2 {
+			n, err = unix.Read(fd.FD, buf.Data[roff:2+fd.MinData])
+		} else {
+			n, err = unix.Read(fd.FD, buf.Data[roff:2+buf.Readsize()])
+		}
 
-			if read < 3 {
-				n, err = unix.Read(fd.FD, buf.Data[read:2+fd.MinData])
-			} else {
-				n, err = unix.Read(fd.FD, buf.Data[read:2+buf.Readsize()])
+		if n > -1 {
+			roff += n
+			buf.ROff = roff
+		}
+
+		switch err {
+		case unix.EINTR:
+			goto read
+
+		case nil:
+			if roff < 3 {
+				goto read
 			}
 
-			if n > -1 {
-				read += n
-				buf.ROff = read
-			}
+			buf.WOff = 0 // ready for writing
 
-			switch err {
-			case unix.EINTR:
-				fallthrough
-
-			case nil:
-				shouldRun = read < 3 || read < (2+buf.Readsize())
-
-				if !shouldRun {
-					buf.WOff = 0 // ready for writing
-				}
-
-			default:
-				return i, err
-			}
+		default:
+			return i, err
 		}
 	}
 
@@ -64,29 +61,25 @@ func (fd *StreamFD) Write(queue *Queue) (int, error) {
 	for i := 0; i < qsize; i += 1 {
 		buf := queue.Peek(i)
 
-		write := buf.WOff
+		woff := buf.WOff
 
-		shouldRun := true
+	write: // goto label
+		n, err := unix.Write(fd.FD, buf.Data[woff:2+buf.Readsize()])
 
-		for shouldRun {
-			n, err := unix.Write(fd.FD, buf.Data[write:2+buf.Readsize()])
+		if n > -1 {
+			woff += n
+			buf.WOff = woff
+		}
 
-			if n > -1 {
-				write += n
-				buf.WOff = write
-			}
+		switch err {
+		case unix.EINTR:
+			goto write
 
-			switch err {
-			case unix.EINTR:
-				shouldRun = true
+		case nil:
+			buf.ROff = 0 // ready for reading
 
-			case nil:
-				buf.ROff = 0 // ready for reading
-				shouldRun = false
-
-			default:
-				return i, err
-			}
+		default:
+			return i, err
 		}
 	}
 
