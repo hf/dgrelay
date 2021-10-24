@@ -2,7 +2,6 @@ package dgrelay
 
 import (
 	"context"
-	"sync"
 )
 
 type Direction struct {
@@ -38,9 +37,7 @@ func (d *Direction) CanForward() bool {
 	return d.CanRead && d.CanWrite || (d.CanWrite && d.WQueue.Size > 0)
 }
 
-func (d *Direction) Forward(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (d *Direction) Forward(ctx context.Context) error {
 	afd := d.A
 	bfd := d.B
 	wqueue := d.WQueue
@@ -58,7 +55,7 @@ func (d *Direction) Forward(ctx context.Context, wg *sync.WaitGroup) {
 				wqueue.Move(n, rqueue)
 
 			default:
-				panic("unknown error")
+				return err
 			}
 		}
 
@@ -73,8 +70,10 @@ func (d *Direction) Forward(ctx context.Context, wg *sync.WaitGroup) {
 				rqueue.Move(n, wqueue)
 
 			default:
-				panic("unknown error")
+				return err
 			}
 		}
 	}
+
+	return nil
 }

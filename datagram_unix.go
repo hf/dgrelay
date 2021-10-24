@@ -1,9 +1,5 @@
 package dgrelay
 
-import (
-	"golang.org/x/sys/unix"
-)
-
 type DatagramFD struct {
 	FD int
 }
@@ -23,9 +19,9 @@ func (fd *DatagramFD) Read(queue *Queue) (int, error) {
 		}
 
 	read: // goto label
-		n, err := unix.Read(fd.FD, buf.Data[2:])
+		n, err := unixRead(fd.FD, buf.Data[2:])
 		switch err {
-		case unix.EINTR:
+		case unixEINTR:
 			goto read
 
 		case nil:
@@ -52,9 +48,9 @@ func (fd *DatagramFD) Write(queue *Queue) (int, error) {
 		}
 
 	write: // goto label
-		n, err := unix.Write(fd.FD, buf.Data[2:2+buf.Readsize()])
+		n, err := unixWrite(fd.FD, buf.Data[2:2+buf.Readsize()])
 		switch err {
-		case unix.EINTR:
+		case unixEINTR:
 			goto write
 
 		case nil:

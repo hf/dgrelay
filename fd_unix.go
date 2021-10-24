@@ -5,14 +5,21 @@ import (
 )
 
 var (
-	EWOULDBLOCK = unix.EWOULDBLOCK
+	EWOULDBLOCK     = unix.EWOULDBLOCK
+	unixEINTR       = unix.EINTR
+	unixWrite       = unix.Write
+	unixRead        = unix.Read
+	unixClose       = unix.Close
+	unixEpollCreate = unix.EpollCreate
+	unixEpollCtl    = unix.EpollCtl
+	unixEpollWait   = unix.EpollWait
 )
 
 func closeFD(fd int) error {
 	for {
-		err := unix.Close(fd)
+		err := unixClose(fd)
 		switch err {
-		case unix.EINTR:
+		case unixEINTR:
 			continue
 
 		default:

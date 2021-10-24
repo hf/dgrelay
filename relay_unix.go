@@ -10,9 +10,9 @@ import (
 
 func epollCreate() (int, error) {
 	for {
-		epfd, err := unix.EpollCreate(2)
+		epfd, err := unixEpollCreate(2)
 		switch err {
-		case unix.EINTR:
+		case unixEINTR:
 			continue
 
 		default:
@@ -23,9 +23,9 @@ func epollCreate() (int, error) {
 
 func epollAdd(epfd int, fd FD, event *unix.EpollEvent) error {
 	for {
-		err := unix.EpollCtl(epfd, unix.EPOLL_CTL_ADD, fd.Unix(), event)
+		err := unixEpollCtl(epfd, unix.EPOLL_CTL_ADD, fd.Unix(), event)
 		switch err {
-		case unix.EINTR:
+		case unixEINTR:
 			continue
 
 		default:
@@ -36,15 +36,21 @@ func epollAdd(epfd int, fd FD, event *unix.EpollEvent) error {
 
 func epollWait(epfd int, events []unix.EpollEvent, msec int) (int, error) {
 	for {
-		n, err := unix.EpollWait(epfd, events, msec)
+		n, err := unixEpollWait(epfd, events, msec)
 		switch err {
-		case unix.EINTR:
+		case unixEINTR:
 			continue
 
 		default:
 			return n, err
 		}
 	}
+}
+
+func forwardDirection(ctx context.Context, dir *Direction, wg *sync.WaitGroup, err *error) {
+	defer wg.Done()
+
+	*err = dir.Forward(ctx)
 }
 
 func Forward(ctx context.Context, afd, bfd FD, buffers, bufferSize int) error {
@@ -118,16 +124,27 @@ func Forward(ctx context.Context, afd, bfd FD, buffers, bufferSize int) error {
 			}
 		}
 
+		var leftErr error = nil
+		var rightErr error = nil
+
 		if left.CanForward() {
 			wg.Add(1)
-			go left.Forward(ctx, wg)
+			go forwardDirection(ctx, left, wg, &leftErr)
 		}
 
 		if right.CanForward() {
 			wg.Add(1)
-			go right.Forward(ctx, wg)
+			go forwardDirection(ctx, right, wg, &rightErr)
 		}
 
 		wg.Wait()
+
+		if nil != leftErr && nil != rightErr {
+			return fmt.Errorf("multiple errors: %v, %v", leftErr, rightErr)
+		} else if nil != leftErr {
+			return leftErr
+		} else if nil != rightErr {
+			return rightErr
+		}
 	}
 }
