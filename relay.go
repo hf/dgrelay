@@ -34,7 +34,7 @@ func NewDirection(afd, bfd FD, buffers, size int) *Direction {
 }
 
 func (d *Direction) CanForward() bool {
-	return d.CanRead && d.CanWrite || (d.CanWrite && d.WQueue.Size > 0)
+	return (d.CanRead && d.RQueue.Size > 0) || (d.CanWrite && d.WQueue.Size > 0)
 }
 
 func (d *Direction) Forward(ctx context.Context) error {
