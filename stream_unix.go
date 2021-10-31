@@ -1,5 +1,9 @@
 package dgrelay
 
+import (
+	"fmt"
+)
+
 type StreamFD struct {
 	FD      int
 	MinData int
@@ -14,22 +18,27 @@ func (fd *StreamFD) Read(queue *Queue) (int, error) {
 
 	for i := 0; i < qsize; i += 1 {
 		buf := queue.Peek(i)
+		mindata := 2 + fd.MinData
 
 		roff := buf.ROff
+		if roff >= mindata {
+			mindata = 2 + buf.Readsize()
+		}
 
 	read: // goto label
-		n := 0
-		var err error
-
-		if roff < 2 {
-			n, err = unixRead(fd.FD, buf.Data[roff:2+fd.MinData])
-		} else {
-			n, err = unixRead(fd.FD, buf.Data[roff:2+buf.Readsize()])
-		}
+		n, err := unixRead(fd.FD, buf.Data[roff:mindata])
 
 		if n > -1 {
 			roff += n
 			buf.ROff = roff
+
+			if roff >= mindata {
+				mindata = 2 + buf.Readsize()
+
+				if mindata > len(buf.Data) {
+					return i, fmt.Errorf("packet signals %v bytes to receive but buffer can only hold %v bytes", mindata, len(buf.Data))
+				}
+			}
 		}
 
 		switch err {
@@ -37,7 +46,7 @@ func (fd *StreamFD) Read(queue *Queue) (int, error) {
 			goto read
 
 		case nil:
-			if roff < 3 {
+			if roff < mindata {
 				goto read
 			}
 
